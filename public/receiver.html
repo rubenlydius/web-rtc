@@ -9,29 +9,54 @@
         body {
             font-family: sans-serif;
             text-align: center;
-        }
-
-        video {
-            max-width: 100%;
-            height: auto;
             background: #000;
+            color: white;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
         }
-
+    
+        /* Adjust these values to change the size */
+        #outputCanvas {
+            width: 640px;
+            /* Fixed width */
+            max-width: 30vw;
+            /* Responsive cap */
+            height: auto;
+            border: 2px solid #333;
+            /* Optional: adds a frame */
+            display: block;
+            margin: 20px auto;
+        }
+    
+        #otherCamera,
+        #hiddenCanvas {
+            display: none;
+        }
+    
         #qrcode {
             margin: 20px auto;
             padding: 10px;
             display: inline-block;
             background: white;
         }
-    </style>
+    
+        </style>
 </head>
 
 <body>
-    <h1>Laptop Display (Receiver)</h1>
-    <p>Scan this QR code with your phone:</p>
-    <div id="qrcode"></div>
-    <br>
+    <div id="ui-layer">
+        <h1>Laptop Display (Receiver)</h1>
+        <p>Scan this QR code with your phone:</p>
+        <div id="qrcode"></div>
+    </div>
+
     <video id="otherCamera" playsinline autoplay muted></video>
+    <canvas id="hiddenCanvas"></canvas>
+    <canvas id="outputCanvas"></canvas>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js" crossorigin="anonymous"
@@ -39,25 +64,31 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 
     <script type="module">
+        import { drawASCII } from './ascii-filter.js';
+
         const $otherCamera = document.getElementById('otherCamera');
         const $qrContainer = document.getElementById('qrcode');
+        const hiddenCtx = document.getElementById('hiddenCanvas').getContext('2d', { willReadFrequently: true });
+        const outputCtx = document.getElementById('outputCanvas').getContext('2d');
 
         let socket;
         let peer;
 
+        const startFilterLoop = () => {
+            drawASCII($otherCamera, hiddenCtx, outputCtx);
+            requestAnimationFrame(startFilterLoop);
+        };
+
         const init = async () => {
             initSocket();
+            // Start the loop immediately; it will just draw nothing until the video starts
+            startFilterLoop();
         };
 
         const initSocket = () => {
             socket = io.connect(`/`);
             socket.on(`connect`, () => {
-                console.log("My Socket ID:", socket.id);
-
-                // Generate the URL for the phone, including this laptop's socket.id
                 const senderUrl = `${window.location.origin}/sender.html?receiverId=${socket.id}`;
-
-                // Create and render the QR Code
                 const qr = qrcode(0, 'L');
                 qr.addData(senderUrl);
                 qr.make();
@@ -65,10 +96,9 @@
             });
 
             socket.on('signal', async (myId, signal, peerId) => {
-                console.log(`Received signal from ${peerId}`);
                 if (signal.type === 'offer') {
-                    // Hide QR code once connection starts
-                    $qrContainer.style.display = 'none';
+                    // Hide the UI text and QR once stream begins
+                    document.getElementById('ui-layer').style.display = 'none';
                     answerPeerOffer(myId, signal, peerId);
                 } else if (peer) {
                     peer.signal(signal);
@@ -77,18 +107,14 @@
         };
 
         const answerPeerOffer = async (myId, offer, peerId) => {
-            // The laptop is not the initiator, it just answers
             peer = new SimplePeer({ initiator: false });
-
             peer.on('signal', data => {
                 socket.emit('signal', peerId, data);
             });
-
             peer.on('stream', stream => {
                 $otherCamera.srcObject = stream;
+                $otherCamera.play();
             });
-
-            // Pass the initial offer to the peer
             peer.signal(offer);
         };
 
