@@ -28,6 +28,88 @@ QR Rendering: Added logic to convert that URL into a scannable QR code on the sc
 
 Role Shift: The laptop was changed from a general peer to a dedicated Answerer. It waits for an "offer" from the phone before creating the Peer object.
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC - Receiver</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; }
+    video { max-width: 100%; height: auto; background: #000; }
+    #qrcode { margin: 20px auto; padding: 10px; display: inline-block; background: white; }
+  </style>
+</head>
+<body>
+  <h1>Laptop Display (Receiver)</h1>
+  <p>Scan this QR code with your phone:</p>
+  <div id="qrcode"></div>
+  <br>
+  <video id="otherCamera" playsinline autoplay muted></video>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+
+  <script type="module">
+    const $otherCamera = document.getElementById('otherCamera');
+    const $qrContainer = document.getElementById('qrcode');
+
+    let socket;
+    let peer;
+
+    const init = async () => {
+      initSocket();
+    };
+
+    const initSocket = () => {
+      socket = io.connect(`/`);
+      socket.on(`connect`, () => {
+        console.log("My Socket ID:", socket.id);
+        
+        // Generate the URL for the phone, including this laptop's socket.id
+        const senderUrl = `${window.location.origin}/sender.html?receiverId=${socket.id}`;
+        
+        // Create and render the QR Code
+        const qr = qrcode(0, 'L');
+        qr.addData(senderUrl);
+        qr.make();
+        $qrContainer.innerHTML = qr.createImgTag(6);
+      });
+
+      socket.on('signal', async (myId, signal, peerId) => {
+        console.log(`Received signal from ${peerId}`);
+        if (signal.type === 'offer') {
+          // Hide QR code once connection starts
+          $qrContainer.style.display = 'none'; 
+          answerPeerOffer(myId, signal, peerId);
+        } else if (peer) {
+          peer.signal(signal);
+        }
+      });
+    };
+
+    const answerPeerOffer = async (myId, offer, peerId) => {
+      // The laptop is not the initiator, it just answers
+      peer = new SimplePeer({ initiator: false });
+      
+      peer.on('signal', data => {
+        socket.emit('signal', peerId, data);
+      });
+      
+      peer.on('stream', stream => {
+        $otherCamera.srcObject = stream;
+      });
+
+      // Pass the initial offer to the peer
+      peer.signal(offer);
+    };
+
+    init();
+  </script>
+</body>
+</html>
+
 2. Sender.html (The Phone)
 Automated Peer Identification: Removed the manual <select> dropdown. Replaced it with URLSearchParams to automatically grab the receiverId from the URL scanned via the QR code.
 
@@ -37,6 +119,216 @@ Camera Optimization: Updated constraints to facingMode: "environment", ensuring 
 
 Role Shift: The phone was set as the Initiator (initiator: true), meaning it creates the "offer" that the laptop then answers.
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC - Sender</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; background: #222; color: white; }
+    video { max-width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <h1>Phone Camera (Sender)</h1>
+  <video id="myCamera" playsinline autoplay muted></video>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script type="module">
+
+    const $myCamera = document.getElementById('myCamera');
+
+    let socket;
+    let myStream;
+    let peer;
+
+    // Get the target laptop ID from the URL scanned via QR
+    const urlParams = new URLSearchParams(window.location.search);
+    const receiverId = urlParams.get('receiverId');
+
+    const init = async () => {
+      if (!receiverId) {
+        alert("No receiver ID found. Please scan the QR code from the laptop.");
+        return;
+      }
+
+      // Grab the phone's back camera
+      const constraints = { audio: false, video: { facingMode: "environment", width: 1280, height: 720 } };
+      try {
+        myStream = await navigator.mediaDevices.getUserMedia(constraints);
+        $myCamera.srcObject = myStream;
+        $myCamera.onloadedmetadata = () => $myCamera.play();
+        
+        // Once camera is ready, connect to socket
+        initSocket();
+      } catch (err) {
+        console.error("Camera access denied or unavailable", err);
+        alert("Camera access is required.");
+      }
+    };
+
+    const initSocket = () => {
+      socket = io.connect('/');
+      
+      socket.on('connect', () => {
+        console.log("Connected to server, initiating call to:", receiverId);
+        callPeer(receiverId);
+      });
+
+      socket.on('signal', async (myId, signal, peerId) => {
+        console.log(`Received signal from ${peerId}`);
+        peer.signal(signal);
+      });
+    };
+
+    const callPeer = async (peerId) => {
+      // The phone is the initiator
+      peer = new SimplePeer({ initiator: true, stream: myStream });
+      
+      peer.on('signal', data => {
+        socket.emit('signal', peerId, data);
+      });
+    };
+
+    init();
+
+  </script>
+</body>
+</html>
 
 ## Added ASCII Filter
-> WIP
+> Asked AI for help to add the ASCII filter to the video stream. I chose to keep the filter in a seperate file (ascii.js) and import it in the sender.html file. The filter is applied to the video stream before it is displayed on the laptop.
+
+- ascii.js
+
+export const drawASCII = (video, hiddenCtx, outputCtx, fontHeight = 12) => {
+  const { videoWidth: width, videoHeight: height } = video;
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&()/\\+<>';
+
+  if (width && height) {
+    if (hiddenCtx.canvas.width !== width) {
+      hiddenCtx.canvas.width = outputCtx.canvas.width = width;
+      hiddenCtx.canvas.height = outputCtx.canvas.height = height;
+    }
+
+    hiddenCtx.drawImage(video, 0, 0, width, height);
+    outputCtx.textBaseline = 'top';
+    outputCtx.font = `${fontHeight}px Consolas`;
+
+    const fontWidth = Math.ceil(outputCtx.measureText('@').width);
+    outputCtx.clearRect(0, 0, width, height);
+
+    for (let y = 0; y < height; y += fontHeight) {
+      for (let x = 0; x < width; x += fontWidth) {
+        const frameSection = hiddenCtx.getImageData(x, y, fontWidth, fontHeight);
+        
+        // Inline Average RGB calculation
+        const data = frameSection.data;
+        let r = 0, g = 0, b = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          r += data[i]; g += data[i+1]; b += data[i+2];
+        }
+        const count = data.length / 4;
+        const char = charset[Math.floor(Math.random() * charset.length)];
+
+        outputCtx.fillStyle = `rgb(${r/count},${g/count},${b/count})`;
+        outputCtx.fillText(char, x, y);
+      }
+    }
+  }
+};
+
+- sender.html (updated)
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC - Receiver</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #000; color: white; margin: 0; }
+        /* Keep video hidden so we only see the ASCII */
+        #otherCamera, #hiddenCanvas { display: none; }
+        #outputCanvas { width: 100vw; height: auto; display: block; }
+        #qrcode { margin: 20px auto; padding: 10px; display: inline-block; background: white; }
+    </style>
+</head>
+<body>
+    <div id="ui-layer">
+        <h1>Laptop Display (Receiver)</h1>
+        <p>Scan this QR code with your phone:</p>
+        <div id="qrcode"></div>
+    </div>
+
+    <video id="otherCamera" playsinline autoplay muted></video>
+    <canvas id="hiddenCanvas"></canvas>
+    <canvas id="outputCanvas"></canvas>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+
+    <script type="module">
+        import { drawASCII } from './ascii-filter.js';
+
+        const $otherCamera = document.getElementById('otherCamera');
+        const $qrContainer = document.getElementById('qrcode');
+        const hiddenCtx = document.getElementById('hiddenCanvas').getContext('2d', { willReadFrequently: true });
+        const outputCtx = document.getElementById('outputCanvas').getContext('2d');
+
+        let socket;
+        let peer;
+
+        const startFilterLoop = () => {
+            drawASCII($otherCamera, hiddenCtx, outputCtx);
+            requestAnimationFrame(startFilterLoop);
+        };
+
+        const init = async () => {
+            initSocket();
+            // Start the loop immediately; it will just draw nothing until the video starts
+            startFilterLoop();
+        };
+
+        const initSocket = () => {
+            socket = io.connect(`/`);
+            socket.on(`connect`, () => {
+                const senderUrl = `${window.location.origin}/sender.html?receiverId=${socket.id}`;
+                const qr = qrcode(0, 'L');
+                qr.addData(senderUrl);
+                qr.make();
+                $qrContainer.innerHTML = qr.createImgTag(6);
+            });
+
+            socket.on('signal', async (myId, signal, peerId) => {
+                if (signal.type === 'offer') {
+                    // Hide the UI text and QR once stream begins
+                    document.getElementById('ui-layer').style.display = 'none';
+                    answerPeerOffer(myId, signal, peerId);
+                } else if (peer) {
+                    peer.signal(signal);
+                }
+            });
+        };
+
+        const answerPeerOffer = async (myId, offer, peerId) => {
+            peer = new SimplePeer({ initiator: false });
+            peer.on('signal', data => {
+                socket.emit('signal', peerId, data);
+            });
+            peer.on('stream', stream => {
+                $otherCamera.srcObject = stream;
+                $otherCamera.play();
+            });
+            peer.signal(offer);
+        };
+
+        init();
+    </script>
+</body>
+</html>
+
+
