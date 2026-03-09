@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC - Sender</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            background: #222;
+            color: white;
+        }
+
+        video {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Phone Camera (Sender)</h1>
+    <video id="myCamera" playsinline autoplay muted></video>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js" crossorigin="anonymous"
+        referrerpolicy="no-referrer"></script>
+    <script type="module">
+
+        const $myCamera = document.getElementById('myCamera');
+
+        let socket;
+        let myStream;
+        let peer;
+
+        // Get the target laptop ID from the URL scanned via QR
+        const urlParams = new URLSearchParams(window.location.search);
+        const receiverId = urlParams.get('receiverId');
+
+        const init = async () => {
+            if (!receiverId) {
+                alert("No receiver ID found. Please scan the QR code from the laptop.");
+                return;
+            }
+
+            // Grab the phone's back camera
+            const constraints = { audio: false, video: { facingMode: "environment", width: 1280, height: 720 } };
+            try {
+                myStream = await navigator.mediaDevices.getUserMedia(constraints);
+                $myCamera.srcObject = myStream;
+                $myCamera.onloadedmetadata = () => $myCamera.play();
+
+                // Once camera is ready, connect to socket
+                initSocket();
+            } catch (err) {
+                console.error("Camera access denied or unavailable", err);
+                alert("Camera access is required.");
+            }
+        };
+
+        const initSocket = () => {
+            socket = io.connect('/');
+
+            socket.on('connect', () => {
+                console.log("Connected to server, initiating call to:", receiverId);
+                callPeer(receiverId);
+            });
+
+            socket.on('signal', async (myId, signal, peerId) => {
+                console.log(`Received signal from ${peerId}`);
+                peer.signal(signal);
+            });
+        };
+
+        const callPeer = async (peerId) => {
+            // The phone is the initiator
+            peer = new SimplePeer({ initiator: true, stream: myStream });
+
+            peer.on('signal', data => {
+                socket.emit('signal', peerId, data);
+            });
+        };
+
+        init();
+
+    </script>
+</body>
+
+</html>
