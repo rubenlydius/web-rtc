@@ -332,3 +332,271 @@ export const drawASCII = (video, hiddenCtx, outputCtx, fontHeight = 12) => {
 </html>
 
 
+
+
+## Terminal link
+> Asked AI for help to add IP adress link into the terminal making it easier to access the project. 
+
+const os = require('os');
+
+server.listen(port, () => {
+  const ip = Object.values(os.networkInterfaces()).flat().find(i => i.family === 'IPv4' && !i.internal)?.address || 'localhost';
+  console.log(`Click here to open: https://${ip}:${port}/receiver.html`);
+});
+
+
+
+
+##color picker 
+
+> make colors picker for filter, user selects color from phone and this is applied to the filter on the laptop. 
+
+<style>
+    body { background: #111; display: flex; align-items: center; min-height: 100vh; margin: 0; }
+    #myCamera { display: none; }
+    
+    .slider-container { width: 100%; padding: 0 30px; }
+
+    #hueSlider {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 25px;
+        border-radius: 15px;
+        /* The color spectrum background */
+        background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+        outline: none;
+    }
+
+    /* Removes the blue 'fill' on the left side in Chrome/Safari/mobile */
+    #hueSlider::-webkit-slider-runnable-track { background: transparent; }
+
+    #hueSlider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 40px;
+        height: 40px;
+        background: white;
+        border-radius: 50%;
+        border: 3px solid #111;
+        cursor: pointer;
+        box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
+</style>
+
+
+<body>
+    <video id="myCamera" playsinline autoplay muted></video>
+
+    <div class="slider-container">
+        <input type="range" id="hueSlider" min="0" max="360" value="0">
+    </div>
+
+</body>
+
+
+socket.on('connect', () => {
+    // ... your callPeer logic ...
+    
+    const slider = document.getElementById('hueSlider');
+    slider.addEventListener('input', () => {
+        // Send the hue value to the specific receiverId
+        socket.emit('update_color', receiverId, slider.value);
+    });
+});
+
+
+socket.on('update_color', (to, hue) => {
+    // Send the color value to the specific laptop
+    socket.to(to).emit('update_color', hue);
+});
+
+
+let currentHue = 0; // Global variable
+
+socket.on('update_color', (hue) => {
+    currentHue = hue; // Update the color when the phone moves the slider
+});
+
+const startFilterLoop = () => {
+    if ($otherCamera.videoWidth > 0) {
+        // Ensure drawASCII is receiving currentHue
+        drawASCII($otherCamera, hiddenCtx, outputCtx, currentHue);
+    }
+    requestAnimationFrame(startFilterLoop);
+};
+
+
+const $myCamera = document.getElementById('myCamera');
+const $hueSlider = document.getElementById('hueSlider'); // Add this reference
+
+
+
+const initSocket = () => {
+    // ... (existing code, insert inside the connect callback) ...
+    socket = io.connect('/');
+    socket.on('connect', () => {
+        console.log("Connected to server, initiating call to:", receiverId);
+
+        // Add listener once connected
+        $hueSlider.addEventListener('input', () => {
+            // Emit new event 'update_color' with the Hue value
+            socket.emit('update_color', receiverId, $hueSlider.value);
+        });
+
+        callPeer(receiverId);
+    });
+    // ... (rest of initSocket) ...
+};
+
+
+// Replacement drawASCII function for 'ascii-filter.js'
+export const drawASCII = (video, hiddenCtx, outputCtx, baseHue = 0, fontHeight = 12) => {
+  const { videoWidth: width, videoHeight: height } = video;
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&()/\\+<>';
+
+  if (width && height) {
+    if (hiddenCtx.canvas.width !== width) {
+      hiddenCtx.canvas.width = outputCtx.canvas.width = width;
+      hiddenCtx.canvas.height = outputCtx.canvas.height = height;
+    }
+
+    hiddenCtx.drawImage(video, 0, 0, width, height);
+    outputCtx.textBaseline = 'top';
+    outputCtx.font = `${fontHeight}px Consolas`;
+
+    const fontWidth = Math.ceil(outputCtx.measureText('@').width);
+    outputCtx.clearRect(0, 0, width, height);
+
+    for (let y = 0; y < height; y += fontHeight) {
+      for (let x = 0; x < width; x += fontWidth) {
+        const frameSection = hiddenCtx.getImageData(x, y, fontWidth, fontHeight);
+        
+        // Calculate luminosity (grayscale)
+        const data = frameSection.data;
+        let r = 0, g = 0, b = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          r += data[i]; g += data[i+1]; b += data[i+2];
+        }
+        const count = data.length / 4;
+        
+        // Grayscale formula:
+        const luminosity = (0.2126 * (r/count) + 0.7152 * (g/count) + 0.0722 * (b/count)) / 255; // Normalize 0-1
+
+        const char = charset[Math.floor(Math.random() * charset.length)];
+
+        // Map grayscale to Lightness (0% to 100%)
+        const lightness = luminosity * 100;
+        
+        // Output HSL color: Incoming Hue, Max Saturation, Contrasting Lightness
+        outputCtx.fillStyle = `hsl(${baseHue}, 100%, ${lightness}%)`;
+        outputCtx.fillText(char, x, y);
+      }
+    }
+  }
+};
+
+
+
+import { drawASCII } from './ascii-filter.js';
+// ... existing references ...
+let currentHue = 0; // Stored hue, defaults to Red
+
+// Update the loop call to include the hue
+const startFilterLoop = () => {
+    if ($otherCamera.videoWidth > 0) {
+        drawASCII($otherCamera, hiddenCtx, outputCtx, currentHue); // Add hue parameter
+    }
+    requestAnimationFrame(startFilterLoop);
+};
+
+
+
+
+
+const initSocket = () => {
+    // ... (existing QR code and connect logic) ...
+    socket.on(`connect`, () => { ... });
+
+    // Listen for the color update event from the phone
+    socket.on('update_color', (hue) => {
+        console.log(`Received color: Hue=${hue}`);
+        currentHue = hue; // Update local state
+    });
+
+    // ... rest of initSocket ...
+};
+
+
+
+## reset to qr code on disconnect 
+
+
+const answerPeerOffer = async (myId, offer, peerId) => {
+    peer = new SimplePeer({ initiator: false });
+
+    // ... (keep your existing peer.on('signal') and peer.on('stream') lines) ...
+
+    // ADD THESE LINES HERE:
+    peer.on('close', () => {
+        console.log("Peer disconnected, resetting...");
+        location.reload(); 
+    });
+
+    peer.on('error', (err) => {
+        console.error("Peer error:", err);
+        location.reload();
+    });
+
+    peer.signal(offer);
+};
+
+
+
+
+socket.on('disconnect', () => {
+    // Broadcast to everyone that this specific ID has left
+    io.emit('peer_disconnected', socket.id);
+});
+
+
+socket.on('peer_disconnected', (disconnectedId) => {
+    // If the QR code is currently hidden, it means we were in a session.
+    // We reload to get back to the start state immediately.
+    if ($qrContainer.style.display === 'none') {
+        console.log("Peer left the building. Resetting now.");
+        location.reload();
+    }
+});
+
+
+
+
+
+
+## crop ratio to fit laptop screen better
+
+
+
+    #outputCanvas {
+        width: 75vw;         /* 75% of the screen width */
+        aspect-ratio: 16 / 9; /* Standard widescreen ratio */
+        background: #111;
+        display: block;
+        
+        /* The Magic: This zooms into the vertical feed and crops 
+           the top/bottom to fill the 16:9 box */
+        object-fit: cover; 
+        
+        border: 2px solid #333;
+    }
+
+
+
+
+const startFilterLoop = () => {
+    if ($otherCamera.videoWidth > 0) {
+        // Lower fontHeight = smaller characters / more detail to compensate for zoom
+        drawASCII($otherCamera, hiddenCtx, outputCtx, currentHue, 7); 
+    }
+    requestAnimationFrame(startFilterLoop);
+};
