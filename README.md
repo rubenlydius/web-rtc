@@ -528,4 +528,42 @@ const initSocket = () => {
 
 
 
+## reset to qr code on disconnect 
 
+
+const answerPeerOffer = async (myId, offer, peerId) => {
+    peer = new SimplePeer({ initiator: false });
+
+    // ... (keep your existing peer.on('signal') and peer.on('stream') lines) ...
+
+    // ADD THESE LINES HERE:
+    peer.on('close', () => {
+        console.log("Peer disconnected, resetting...");
+        location.reload(); 
+    });
+
+    peer.on('error', (err) => {
+        console.error("Peer error:", err);
+        location.reload();
+    });
+
+    peer.signal(offer);
+};
+
+
+
+
+socket.on('disconnect', () => {
+    // Broadcast to everyone that this specific ID has left
+    io.emit('peer_disconnected', socket.id);
+});
+
+
+socket.on('peer_disconnected', (disconnectedId) => {
+    // If the QR code is currently hidden, it means we were in a session.
+    // We reload to get back to the start state immediately.
+    if ($qrContainer.style.display === 'none') {
+        console.log("Peer left the building. Resetting now.");
+        location.reload();
+    }
+});
