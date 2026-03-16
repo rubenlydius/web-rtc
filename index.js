@@ -3,6 +3,7 @@ const isDevelopment = (process.env.NODE_ENV === 'development');
 const express = require('express');
 const app = express();
 const fs = require('fs');
+const os = require('os');
 
 let options = {};
 if (isDevelopment) {
@@ -18,7 +19,8 @@ const port = process.env.PORT || 443;
 app.use(express.static('public'));
 
 server.listen(port, () => {
- console.log(`App listening on port ${port}!`);
+  const ip = Object.values(os.networkInterfaces()).flat().find(i => i.family === 'IPv4' && !i.internal)?.address || 'localhost';
+  console.log(`Click here to open: https://${ip}:${port}/receiver.html`);
 });
 
 const { Server } = require("socket.io");

@@ -332,3 +332,15 @@ export const drawASCII = (video, hiddenCtx, outputCtx, fontHeight = 12) => {
 </html>
 
 
+
+
+## Terminal link
+> Asked AI for help to add IP adress link into the terminal making it easier to access the project. 
+
+const os = require('os');
+
+server.listen(port, () => {
+  const ip = Object.values(os.networkInterfaces()).flat().find(i => i.family === 'IPv4' && !i.internal)?.address || 'localhost';
+  console.log(`Click here to open: https://${ip}:${port}/receiver.html`);
+});
+
