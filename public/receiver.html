@@ -7,29 +7,28 @@
     <title>WebRTC - Receiver</title>
     <style>
         body {
-            font-family: sans-serif;
-            text-align: center;
             background: #000;
-            color: white;
             margin: 0;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             min-height: 100vh;
+            overflow: hidden;
         }
     
-        /* Adjust these values to change the size */
         #outputCanvas {
-            width: 640px;
-            /* Fixed width */
-            max-width: 30vw;
-            /* Responsive cap */
-            height: auto;
-            border: 2px solid #333;
-            /* Optional: adds a frame */
+            width: 75vw;
+            /* 75% of the screen width */
+            aspect-ratio: 16 / 9;
+            /* Standard widescreen ratio */
+            background: #111;
             display: block;
-            margin: 20px auto;
+    
+            /* The Magic: This zooms into the vertical feed and crops 
+                   the top/bottom to fill the 16:9 box */
+            object-fit: cover;
+    
+            border: 2px solid #333;
         }
     
         #otherCamera,
@@ -38,9 +37,7 @@
         }
     
         #qrcode {
-            margin: 20px auto;
             padding: 10px;
-            display: inline-block;
             background: white;
         }
     
@@ -79,8 +76,9 @@
         const startFilterLoop = () => {
                 if ($otherCamera.videoWidth > 0) {
                     // Ensure drawASCII is receiving currentHue
-                    drawASCII($otherCamera, hiddenCtx, outputCtx, currentHue);
+                    drawASCII($otherCamera, hiddenCtx, outputCtx, currentHue, 7);
                 }
+
                 requestAnimationFrame(startFilterLoop);
         };
 

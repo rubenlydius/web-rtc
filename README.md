@@ -567,3 +567,36 @@ socket.on('peer_disconnected', (disconnectedId) => {
         location.reload();
     }
 });
+
+
+
+
+
+
+## crop ratio to fit laptop screen better
+
+
+
+    #outputCanvas {
+        width: 75vw;         /* 75% of the screen width */
+        aspect-ratio: 16 / 9; /* Standard widescreen ratio */
+        background: #111;
+        display: block;
+        
+        /* The Magic: This zooms into the vertical feed and crops 
+           the top/bottom to fill the 16:9 box */
+        object-fit: cover; 
+        
+        border: 2px solid #333;
+    }
+
+
+
+
+const startFilterLoop = () => {
+    if ($otherCamera.videoWidth > 0) {
+        // Lower fontHeight = smaller characters / more detail to compensate for zoom
+        drawASCII($otherCamera, hiddenCtx, outputCtx, currentHue, 7); 
+    }
+    requestAnimationFrame(startFilterLoop);
+};
