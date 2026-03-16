@@ -33,6 +33,7 @@ io.on('connection', socket => {
   socket.on('disconnect', () => {
     delete clients[socket.id];
     io.emit('clients', clients);
+    io.emit('peer_disconnected', socket.id);
   });
 
   socket.on('signal', (peerId, signal) => {
@@ -41,5 +42,10 @@ io.on('connection', socket => {
   });
 
   io.emit('clients', clients);
+
+  socket.on('update_color', (to, hue) => {
+    // Send the color value to the specific laptop
+    socket.to(to).emit('update_color', hue);
+});
 
 });

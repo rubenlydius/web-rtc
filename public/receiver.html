@@ -66,6 +66,8 @@
     <script type="module">
         import { drawASCII } from './ascii-filter.js';
 
+        let currentHue = 0; // Stored hue, defaults to Red
+
         const $otherCamera = document.getElementById('otherCamera');
         const $qrContainer = document.getElementById('qrcode');
         const hiddenCtx = document.getElementById('hiddenCanvas').getContext('2d', { willReadFrequently: true });
@@ -75,8 +77,11 @@
         let peer;
 
         const startFilterLoop = () => {
-            drawASCII($otherCamera, hiddenCtx, outputCtx);
-            requestAnimationFrame(startFilterLoop);
+                if ($otherCamera.videoWidth > 0) {
+                    // Ensure drawASCII is receiving currentHue
+                    drawASCII($otherCamera, hiddenCtx, outputCtx, currentHue);
+                }
+                requestAnimationFrame(startFilterLoop);
         };
 
         const init = async () => {
@@ -95,6 +100,10 @@
                 $qrContainer.innerHTML = qr.createImgTag(6);
             });
 
+            socket.on('update_color', (hue) => {
+                currentHue = hue; // Update the color when the phone moves the slider
+            });
+
             socket.on('signal', async (myId, signal, peerId) => {
                 if (signal.type === 'offer') {
                     // Hide the UI text and QR once stream begins
@@ -102,6 +111,15 @@
                     answerPeerOffer(myId, signal, peerId);
                 } else if (peer) {
                     peer.signal(signal);
+                }
+            });
+
+            socket.on('peer_disconnected', (disconnectedId) => {
+                // If the QR code is currently hidden, it means we were in a session.
+                // We reload to get back to the start state immediately.
+                if ($qrContainer.style.display === 'none') {
+                    console.log("Peer left the building. Resetting now.");
+                    location.reload();
                 }
             });
         };
@@ -115,6 +133,16 @@
                 $otherCamera.srcObject = stream;
                 $otherCamera.play();
             });
+            peer.on('close', () => {
+                console.log("Peer disconnected, resetting...");
+                location.reload();
+            });
+
+            peer.on('error', (err) => {
+                console.error("Peer error:", err);
+                location.reload();
+            });
+
             peer.signal(offer);
         };
 
