@@ -63,7 +63,8 @@
     <script type="module">
         import { drawASCII } from './ascii-filter.js';
 
-        let currentHue = 0; // Stored hue, defaults to Red
+        let currentHue = 0;
+        let currentFontSize = 7; // Add a stored font size state, defaulting to 7
 
         const $otherCamera = document.getElementById('otherCamera');
         const $qrContainer = document.getElementById('qrcode');
@@ -74,12 +75,12 @@
         let peer;
 
         const startFilterLoop = () => {
-                if ($otherCamera.videoWidth > 0) {
-                    // Ensure drawASCII is receiving currentHue
-                    drawASCII($otherCamera, hiddenCtx, outputCtx, currentHue, 7);
-                }
+            if ($otherCamera.videoWidth > 0) {
+                // Pass the currentFontSize dynamically instead of hardcoding '7'
+                drawASCII($otherCamera, hiddenCtx, outputCtx, currentHue, currentFontSize);
+            }
 
-                requestAnimationFrame(startFilterLoop);
+            requestAnimationFrame(startFilterLoop);
         };
 
         const init = async () => {
@@ -100,6 +101,11 @@
 
             socket.on('update_color', (hue) => {
                 currentHue = hue; // Update the color when the phone moves the slider
+            });
+
+            socket.on('update_size', (size) => {
+                // Parse it to make sure it's read as an integer, not a string!
+                currentFontSize = parseInt(size, 10);
             });
 
             socket.on('signal', async (myId, signal, peerId) => {

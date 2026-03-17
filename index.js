@@ -46,6 +46,10 @@ io.on('connection', socket => {
   socket.on('update_color', (to, hue) => {
     // Send the color value to the specific laptop
     socket.to(to).emit('update_color', hue);
-});
+  });
+
+  socket.on('update_size', (to, size) => {
+    socket.to(to).emit('update_size', size);
+  });
 
 });

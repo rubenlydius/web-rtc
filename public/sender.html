@@ -49,6 +49,37 @@
             cursor: pointer;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
         }
+
+
+        /* Add labels so you know which slider is which */
+        label {
+            color: white;
+            font-family: sans-serif;
+            display: block;
+            margin-bottom: 8px;
+            margin-top: 20px;
+        }
+
+        #sizeSlider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 25px;
+            border-radius: 15px;
+            background: #555; /* Neutral background for size */
+            outline: none;
+        }
+
+        #sizeSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            border: 3px solid #111;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
     
         </style>
 </head>
@@ -58,7 +89,11 @@
     <video id="myCamera" playsinline autoplay muted></video>
     
     <div class="slider-container">
+        <label for="hueSlider">ASCII Color Hue</label>
         <input type="range" id="hueSlider" min="0" max="360" value="0">
+    
+        <label for="sizeSlider">ASCII Font Size</label>
+        <input type="range" id="sizeSlider" min="5" max="30" value="7">
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -103,24 +138,31 @@
         };
 
         const initSocket = () => {
-            socket = io.connect('/');
+                socket = io.connect('/');
 
-            socket.on('connect', () => {
-                console.log("Connected to server, initiating call to:", receiverId);
-                
-                const slider = document.getElementById('hueSlider');
-                slider.addEventListener('input', () => {
-                    // Send the hue value to the specific receiverId
-                    socket.emit('update_color', receiverId, slider.value);
+                socket.on('connect', () => {
+                    console.log("Connected to server, initiating call to:", receiverId);
+
+                    const hueSlider = document.getElementById('hueSlider');
+                    hueSlider.addEventListener('input', () => {
+                        // Send the hue value to the specific receiverId
+                        socket.emit('update_color', receiverId, hueSlider.value);
+                    });
+
+                    // Add this specific block for your new slider:
+                    const sizeSlider = document.getElementById('sizeSlider');
+                    sizeSlider.addEventListener('input', () => {
+                        // Send the font size value to the specific receiverId
+                        socket.emit('update_size', receiverId, sizeSlider.value);
+                    });
+
+                    callPeer(receiverId);
                 });
 
-                callPeer(receiverId);
-            });
-
-            socket.on('signal', async (myId, signal, peerId) => {
-                console.log(`Received signal from ${peerId}`);
-                peer.signal(signal);
-            });
+                socket.on('signal', async (myId, signal, peerId) => {
+                    console.log(`Received signal from ${peerId}`);
+                    peer.signal(signal);
+                });
         };
 
         const callPeer = async (peerId) => {
