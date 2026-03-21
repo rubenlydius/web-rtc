@@ -81,38 +81,39 @@
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
         }
 
-        #flipCamera {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 10px 20px;
-            background: #444;
-            color: white;
-            border: 2px solid #666;
-            border-radius: 5px;
-            font-family: sans-serif;
-            z-index: 100;
+        .button-container {
+            display: flex;
+            gap: 15px; /* Adds space between the two buttons */
+            margin-top: 30px;
+            width: 100%;
         }
-        #flipCamera:active {
-            background: #222;
+
+        .action-btn {
+            flex: 1; /* Makes both buttons take up exactly 50% of the available space */
+            padding: 15px 0;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            font-family: sans-serif;
+            cursor: pointer;
         }
 
         #snapPhoto {
-        position: fixed;
-        top: 70px; /* Positioned just below the flip camera button */
-        right: 20px;
-        padding: 10px 20px;
-        background: #e74c3c; /* A nice red color for a shutter button */
-        color: white;
-        border: 2px solid #c0392b;
-        border-radius: 5px;
-        font-family: sans-serif;
-        font-weight: bold;
-        z-index: 100;
-        cursor: pointer;
-    }
+            background: #e74c3c;
+        }
+
         #snapPhoto:active {
             background: #c0392b;
+        }
+
+        #flipCamera {
+            background: #444;
+        }
+
+        #flipCamera:active {
+            background: #222;
         }
     
         </style>
@@ -121,16 +122,18 @@
 <body>
     <!-- <h1>Phone Control (Sender)</h1> -->
     <video id="myCamera" playsinline autoplay muted></video>
-
-    <button id="flipCamera">Flip Camera</button>
-    <button id="snapPhoto">Take Photo</button>
     
     <div class="slider-container">
-        <label for="hueSlider">ASCII Color Hue</label>
+        <label for="hueSlider">Color Hue</label>
         <input type="range" id="hueSlider" min="0" max="360" value="0">
     
-        <label for="sizeSlider">ASCII Font Size</label>
+        <label for="sizeSlider">Font Size</label>
         <input type="range" id="sizeSlider" min="5" max="30" value="7">
+    
+        <div class="button-container">
+            <button id="snapPhoto" class="action-btn">Take Photo</button>
+            <button id="flipCamera" class="action-btn">Flip Camera</button>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
