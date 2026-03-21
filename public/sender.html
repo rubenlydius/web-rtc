@@ -80,6 +80,22 @@
             cursor: pointer;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
         }
+
+        #flipCamera {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #444;
+            color: white;
+            border: 2px solid #666;
+            border-radius: 5px;
+            font-family: sans-serif;
+            z-index: 100;
+        }
+        #flipCamera:active {
+            background: #222;
+        }
     
         </style>
 </head>
@@ -87,6 +103,8 @@
 <body>
     <!-- <h1>Phone Control (Sender)</h1> -->
     <video id="myCamera" playsinline autoplay muted></video>
+
+    <button id="flipCamera">Flip Camera</button>
     
     <div class="slider-container">
         <label for="hueSlider">ASCII Color Hue</label>
@@ -99,61 +117,51 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js" crossorigin="anonymous"
         referrerpolicy="no-referrer"></script>
-    <script type="module">
+        <script type="module">
+            const $myCamera = document.getElementById('myCamera');
+            const $hueSlider = document.getElementById('hueSlider');
+            const $sizeSlider = document.getElementById('sizeSlider');
 
-        const $myCamera = document.getElementById('myCamera');
-        const $hueSlider = document.getElementById('hueSlider'); // Add this reference
+            let socket;
+            let myStream;
+            let peer;
 
-        let socket;
-        let myStream;
-        let peer;
+            // Get the target laptop ID from the URL scanned via QR
+            const urlParams = new URLSearchParams(window.location.search);
+            const receiverId = urlParams.get('receiverId');
 
-        // Get the target laptop ID from the URL scanned via QR
-        const urlParams = new URLSearchParams(window.location.search);
-        const receiverId = urlParams.get('receiverId');
+            let usingFrontCamera = false; // Track state
 
-        
+            const init = async () => {
+                if (!receiverId) {
+                    alert("No receiver ID found. Please scan the QR code from the laptop.");
+                    return;
+                }
 
+                // 1. Initial camera start (we removed the redundant getUserMedia call here)
+                await startCamera();
 
+                // 2. Once camera is ready, connect to socket
+                if (myStream) {
+                    initSocket();
+                }
 
-        const init = async () => {
-            if (!receiverId) {
-                alert("No receiver ID found. Please scan the QR code from the laptop.");
-                return;
-            }
+                // 3. Bind flip button
+                document.getElementById('flipCamera').onclick = switchCamera;
+            };
 
-            // Grab the phone's back camera
-            const constraints = { audio: false, video: { facingMode: "environment", width: 1280, height: 720 } };
-            try {
-                myStream = await navigator.mediaDevices.getUserMedia(constraints);
-                $myCamera.srcObject = myStream;
-                $myCamera.onloadedmetadata = () => $myCamera.play();
-
-                // Once camera is ready, connect to socket
-                initSocket();
-            } catch (err) {
-                console.error("Camera access denied or unavailable", err);
-                alert("Camera access is required.");
-            }
-        };
-
-        const initSocket = () => {
+            const initSocket = () => {
                 socket = io.connect('/');
 
                 socket.on('connect', () => {
                     console.log("Connected to server, initiating call to:", receiverId);
 
-                    const hueSlider = document.getElementById('hueSlider');
-                    hueSlider.addEventListener('input', () => {
-                        // Send the hue value to the specific receiverId
-                        socket.emit('update_color', receiverId, hueSlider.value);
+                    $hueSlider.addEventListener('input', () => {
+                        socket.emit('update_color', receiverId, $hueSlider.value);
                     });
 
-                    // Add this specific block for your new slider:
-                    const sizeSlider = document.getElementById('sizeSlider');
-                    sizeSlider.addEventListener('input', () => {
-                        // Send the font size value to the specific receiverId
-                        socket.emit('update_size', receiverId, sizeSlider.value);
+                    $sizeSlider.addEventListener('input', () => {
+                        socket.emit('update_size', receiverId, $sizeSlider.value);
                     });
 
                     callPeer(receiverId);
@@ -161,22 +169,62 @@
 
                 socket.on('signal', async (myId, signal, peerId) => {
                     console.log(`Received signal from ${peerId}`);
-                    peer.signal(signal);
+                    if (peer) peer.signal(signal);
                 });
-        };
+            };
 
-        const callPeer = async (peerId) => {
-            // The phone is the initiator
-            peer = new SimplePeer({ initiator: true, stream: myStream });
+            const callPeer = async (peerId) => {
+                // The phone is the initiator
+                peer = new SimplePeer({ initiator: true, stream: myStream });
 
-            peer.on('signal', data => {
-                socket.emit('signal', peerId, data);
-            });
-        };
+                peer.on('signal', data => {
+                    socket.emit('signal', peerId, data);
+                });
+            };
 
-        init();
+            const startCamera = async () => {
+                // Determine which camera to use
+                const mode = usingFrontCamera ? "user" : "environment";
+                const constraints = {
+                    audio: false,
+                    video: { facingMode: mode, width: 1280, height: 720 }
+                };
 
-    </script>
+                try {
+                    const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    const newVideoTrack = newStream.getVideoTracks()[0];
+
+                    if (myStream && peer) {
+                        const oldVideoTrack = myStream.getVideoTracks()[0];
+
+                        // THE MAGIC: Replace the track seamlessly instead of the whole stream
+                        peer.replaceTrack(oldVideoTrack, newVideoTrack, myStream);
+
+                        // Stop the old track to release hardware and turn off the camera light
+                        oldVideoTrack.stop();
+
+                        // Swap the track in our local preview stream
+                        myStream.removeTrack(oldVideoTrack);
+                        myStream.addTrack(newVideoTrack);
+                    } else {
+                        // First-time load setup
+                        myStream = newStream;
+                        $myCamera.srcObject = myStream;
+                        $myCamera.onloadedmetadata = () => $myCamera.play();
+                    }
+                } catch (err) {
+                    console.error("Error accessing camera:", err);
+                    alert("Camera access is required.");
+                }
+            };
+
+            const switchCamera = async () => {
+                usingFrontCamera = !usingFrontCamera;
+                await startCamera();
+            };
+
+            init();
+        </script>
 </body>
 
 </html>

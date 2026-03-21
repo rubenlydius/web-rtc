@@ -680,3 +680,31 @@ socket.to(to).emit('update_size', size);
 });
 
 
+
+
+
+## flip camera feature 
+
+Asked AI for help to add flip camera feature, allowing user to switch between front and back camera on the phone, with the video feed on the laptop updating accordingly. 
+
+<button id="flipCamera">Flip Camera</button>
+
+
+// The core logic inside startCamera()
+const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+const newVideoTrack = newStream.getVideoTracks()[0];
+
+if (myStream && peer) {
+    const oldVideoTrack = myStream.getVideoTracks()[0];
+    
+    // Swaps the video feed without dropping the WebRTC connection
+    peer.replaceTrack(oldVideoTrack, newVideoTrack, myStream);
+
+    // Turn off the old camera hardware to save battery
+    oldVideoTrack.stop();
+
+    // Update the local stream object
+    myStream.removeTrack(oldVideoTrack);
+    myStream.addTrack(newVideoTrack);
+}
+
