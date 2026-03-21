@@ -600,3 +600,179 @@ const startFilterLoop = () => {
     }
     requestAnimationFrame(startFilterLoop);
 };
+
+
+
+
+## font size slider 
+
+
+asked ai for help to add font size slider to the phone, allowing user to adjust the font size of the ascii filter on the laptop in real time.
+
+
+
+label {
+color: white;
+font-family: sans-serif;
+display: block;
+margin-bottom: 8px;
+margin-top: 20px;
+}
+
+#sizeSlider {
+-webkit-appearance: none;
+width: 100%;
+height: 25px;
+border-radius: 15px;
+background: #555; /* Neutral background for size */
+outline: none;
+}
+
+#sizeSlider::-webkit-slider-thumb {
+-webkit-appearance: none;
+appearance: none;
+width: 40px;
+height: 40px;
+background: white;
+border-radius: 50%;
+border: 3px solid #111;
+cursor: pointer;
+box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+
+
+<label for="hueSlider">ASCII Color Hue</label>
+<input type="range" id="hueSlider" min="0" max="360" value="0">
+
+<label for="sizeSlider">ASCII Font Size</label>
+<input type="range" id="sizeSlider" min="5" max="30" value="7">
+
+
+
+const hueSlider = document.getElementById('hueSlider');
+hueSlider.addEventListener('input', () => {......});
+
+
+
+// Add this specific block for your new slider:
+const sizeSlider = document.getElementById('sizeSlider');
+sizeSlider.addEventListener('input', () => {
+  // Send the font size value to the specific receiverId
+  socket.emit('update_size', receiverId, sizeSlider.value); .... });
+
+
+
+let currentFontSize = 7;
+
+// Pass the currentFontSize dynamically instead of hardcoding '7'
+drawASCII($otherCamera, hiddenCtx, outputCtx, currentHue, currentFontSize);
+
+
+socket.on('update_size', (size) => {
+// Parse it to make sure it's read as an integer, not a string!
+currentFontSize = parseInt(size, 10);
+});
+
+
+socket.on('update_size', (to, size) => {
+socket.to(to).emit('update_size', size);
+});
+
+
+
+
+
+## flip camera feature 
+
+Asked AI for help to add flip camera feature, allowing user to switch between front and back camera on the phone, with the video feed on the laptop updating accordingly. 
+
+<button id="flipCamera">Flip Camera</button>
+
+
+// The core logic inside startCamera()
+const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+const newVideoTrack = newStream.getVideoTracks()[0];
+
+if (myStream && peer) {
+    const oldVideoTrack = myStream.getVideoTracks()[0];
+    
+    // Swaps the video feed without dropping the WebRTC connection
+    peer.replaceTrack(oldVideoTrack, newVideoTrack, myStream);
+
+    // Turn off the old camera hardware to save battery
+    oldVideoTrack.stop();
+
+    // Update the local stream object
+    myStream.removeTrack(oldVideoTrack);
+    myStream.addTrack(newVideoTrack);
+}
+
+
+
+## take picture feature
+
+asked ai for help how to take a picture of the current video feed on the laptop and download it as an image file when the user clicks a button on the phone.
+
+
+// Relays the photo command from phone to laptop (index.js)
+  socket.on('take_photo', (to) => {
+    socket.to(to).emit('take_photo');
+  });
+
+
+
+(sender.html)
+
+<button id="snapPhoto">Take Photo 📸</button>
+
+#snapPhoto {
+    position: fixed;
+    top: 70px; /* Positioned just below the flip camera button */
+    right: 20px;
+    padding: 10px 20px;
+    background: #e74c3c; /* A nice red color for a shutter button */
+    color: white;
+    border: 2px solid #c0392b;
+    border-radius: 5px;
+    font-family: sans-serif;
+    font-weight: bold;
+    z-index: 100;
+    cursor: pointer;
+}
+#snapPhoto:active {
+    background: #c0392b;
+}
+
+
+const $snapPhoto = document.getElementById('snapPhoto');
+$snapPhoto.addEventListener('click', () => {
+    socket.emit('take_photo', receiverId);
+});
+
+
+
+(receiver.html)
+
+
+socket.on('take_photo', () => {
+    // 1. Get the canvas element
+    const canvas = document.getElementById('outputCanvas');
+    
+    // 2. Convert the canvas drawing into a PNG image data URL
+    const imageURL = canvas.toDataURL('image/png');
+    
+    // 3. Create a temporary, invisible link element
+    const downloadLink = document.createElement('a');
+    
+    // 4. Set the filename (using a timestamp so they don't overwrite)
+    downloadLink.download = `ascii-art-${Date.now()}.png`;
+    downloadLink.href = imageURL;
+    
+    // 5. Simulate a click to trigger the download, then clean up
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+});
+
+

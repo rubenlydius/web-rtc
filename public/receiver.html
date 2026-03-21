@@ -16,19 +16,38 @@
             overflow: hidden;
         }
     
+        /* Update the outputCanvas to be hidden by default */
         #outputCanvas {
-            width: 75vw;
-            /* 75% of the screen width */
+            width: 90vw;
             aspect-ratio: 16 / 9;
-            /* Standard widescreen ratio */
             background: #111;
-            display: block;
-    
-            /* The Magic: This zooms into the vertical feed and crops 
-                   the top/bottom to fill the 16:9 box */
+            display: none; /* Changed from block to none */
             object-fit: cover;
-    
             border: 2px solid #333;
+        }
+
+        /* Add styling for the waiting screen */
+        #ui-layer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: sans-serif;
+            text-align: center;
+        }
+
+        #ui-layer h1 {
+            font-size: 3rem;
+            margin-bottom: 5px;
+            text-transform: lowercase; /* Optional: gives it a cool tech vibe */
+        }
+
+        #ui-layer p {
+            font-size: 1.2rem;
+            color: #aaa;
+            margin-top: 0;
+            margin-bottom: 30px;
         }
     
         #otherCamera,
@@ -46,8 +65,8 @@
 
 <body>
     <div id="ui-layer">
-        <h1>Laptop Display (Receiver)</h1>
-        <p>Scan this QR code with your phone:</p>
+        <h1>ascii filter</h1>
+        <p>Scan the qr code to connect.</p>
         <div id="qrcode"></div>
     </div>
 
@@ -63,7 +82,8 @@
     <script type="module">
         import { drawASCII } from './ascii-filter.js';
 
-        let currentHue = 0; // Stored hue, defaults to Red
+        let currentHue = 0;
+        let currentFontSize = 7; // Add a stored font size state, defaulting to 7
 
         const $otherCamera = document.getElementById('otherCamera');
         const $qrContainer = document.getElementById('qrcode');
@@ -74,12 +94,12 @@
         let peer;
 
         const startFilterLoop = () => {
-                if ($otherCamera.videoWidth > 0) {
-                    // Ensure drawASCII is receiving currentHue
-                    drawASCII($otherCamera, hiddenCtx, outputCtx, currentHue, 7);
-                }
+            if ($otherCamera.videoWidth > 0) {
+                // Pass the currentFontSize dynamically instead of hardcoding '7'
+                drawASCII($otherCamera, hiddenCtx, outputCtx, currentHue, currentFontSize);
+            }
 
-                requestAnimationFrame(startFilterLoop);
+            requestAnimationFrame(startFilterLoop);
         };
 
         const init = async () => {
@@ -102,10 +122,19 @@
                 currentHue = hue; // Update the color when the phone moves the slider
             });
 
+            socket.on('update_size', (size) => {
+                // Parse it to make sure it's read as an integer, not a string!
+                currentFontSize = parseInt(size, 10);
+            });
+
             socket.on('signal', async (myId, signal, peerId) => {
                 if (signal.type === 'offer') {
-                    // Hide the UI text and QR once stream begins
+                    // Hide the waiting screen
                     document.getElementById('ui-layer').style.display = 'none';
+
+                    // Show the canvas now that the stream is starting
+                    document.getElementById('outputCanvas').style.display = 'block';
+
                     answerPeerOffer(myId, signal, peerId);
                 } else if (peer) {
                     peer.signal(signal);
@@ -119,6 +148,26 @@
                     console.log("Peer left the building. Resetting now.");
                     location.reload();
                 }
+            });
+
+            socket.on('take_photo', () => {
+                // 1. Get the canvas element
+                const canvas = document.getElementById('outputCanvas');
+
+                // 2. Convert the canvas drawing into a PNG image data URL
+                const imageURL = canvas.toDataURL('image/png');
+
+                // 3. Create a temporary, invisible link element
+                const downloadLink = document.createElement('a');
+
+                // 4. Set the filename (using a timestamp so they don't overwrite)
+                downloadLink.download = `ascii-art-${Date.now()}.png`;
+                downloadLink.href = imageURL;
+
+                // 5. Simulate a click to trigger the download, then clean up
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
             });
         };
 
