@@ -52,4 +52,8 @@ io.on('connection', socket => {
     socket.to(to).emit('update_size', size);
   });
 
+  socket.on('take_photo', (to) => {
+    socket.to(to).emit('take_photo');
+  });
+
 });

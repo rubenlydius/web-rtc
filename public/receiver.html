@@ -17,7 +17,7 @@
         }
     
         #outputCanvas {
-            width: 75vw;
+            width: 90vw;
             /* 75% of the screen width */
             aspect-ratio: 16 / 9;
             /* Standard widescreen ratio */
@@ -125,6 +125,26 @@
                     console.log("Peer left the building. Resetting now.");
                     location.reload();
                 }
+            });
+
+            socket.on('take_photo', () => {
+                // 1. Get the canvas element
+                const canvas = document.getElementById('outputCanvas');
+
+                // 2. Convert the canvas drawing into a PNG image data URL
+                const imageURL = canvas.toDataURL('image/png');
+
+                // 3. Create a temporary, invisible link element
+                const downloadLink = document.createElement('a');
+
+                // 4. Set the filename (using a timestamp so they don't overwrite)
+                downloadLink.download = `ascii-art-${Date.now()}.png`;
+                downloadLink.href = imageURL;
+
+                // 5. Simulate a click to trigger the download, then clean up
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
             });
         };
 

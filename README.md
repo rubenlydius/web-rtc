@@ -708,3 +708,71 @@ if (myStream && peer) {
     myStream.addTrack(newVideoTrack);
 }
 
+
+
+## take picture feature
+
+asked ai for help how to take a picture of the current video feed on the laptop and download it as an image file when the user clicks a button on the phone.
+
+
+// Relays the photo command from phone to laptop (index.js)
+  socket.on('take_photo', (to) => {
+    socket.to(to).emit('take_photo');
+  });
+
+
+
+(sender.html)
+
+<button id="snapPhoto">Take Photo 📸</button>
+
+#snapPhoto {
+    position: fixed;
+    top: 70px; /* Positioned just below the flip camera button */
+    right: 20px;
+    padding: 10px 20px;
+    background: #e74c3c; /* A nice red color for a shutter button */
+    color: white;
+    border: 2px solid #c0392b;
+    border-radius: 5px;
+    font-family: sans-serif;
+    font-weight: bold;
+    z-index: 100;
+    cursor: pointer;
+}
+#snapPhoto:active {
+    background: #c0392b;
+}
+
+
+const $snapPhoto = document.getElementById('snapPhoto');
+$snapPhoto.addEventListener('click', () => {
+    socket.emit('take_photo', receiverId);
+});
+
+
+
+(receiver.html)
+
+
+socket.on('take_photo', () => {
+    // 1. Get the canvas element
+    const canvas = document.getElementById('outputCanvas');
+    
+    // 2. Convert the canvas drawing into a PNG image data URL
+    const imageURL = canvas.toDataURL('image/png');
+    
+    // 3. Create a temporary, invisible link element
+    const downloadLink = document.createElement('a');
+    
+    // 4. Set the filename (using a timestamp so they don't overwrite)
+    downloadLink.download = `ascii-art-${Date.now()}.png`;
+    downloadLink.href = imageURL;
+    
+    // 5. Simulate a click to trigger the download, then clean up
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+});
+
+
